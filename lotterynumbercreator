@@ -2,6 +2,7 @@ import random as rd
 import time
 
 lottery = []
+time.sleep(1)
 while len(lottery) != 6:
     passthisno = 0
     no = rd.randrange(1,46,1)
@@ -9,8 +10,10 @@ while len(lottery) != 6:
         if no == i:
             passthisno = 1
     if passthisno == 0:
+        print(no)
+        time.sleep(2)
         lottery.append(no)
         
-for i in lottery:
-    print(i)
-    time.sleep(0.5)
+lottery.sort()
+time.sleep(1)
+print(lottery)
