@@ -1,6 +1,7 @@
 import pandas as pds
 import requests as rq
 from bs4 import BeautifulSoup as bs
+import webbrowser as wb
 import os
 import warnings
 warnings.filterwarnings('ignore')
@@ -11,7 +12,7 @@ articledateid = 'ul.date_search'
 articletitleid = 'span.title'
 
 def articlecrawling(url, htmlid, dateid, titleid):
-    webget = rq.get(noticeurl, verify=False)
+    webget = rq.get(url, verify=False)
     htmltext = bs(webget.text, 'html.parser').select(htmlid)[0]
     
     dateinfo = htmltext.find_all('dd')
@@ -33,10 +34,12 @@ def articlecrawling(url, htmlid, dateid, titleid):
         print('SOME OF ID CONDITIONS ARE WRONG - CHECK THE HTML TEXT AGAIN')
         print(htmltext)
         
-def updatecheck(newdt):
+def updatecheck(newdt, url):
     olddt = pds.read_csv('pastresult.csv')
     if newdt.iloc[0][0] == olddt.iloc[0][0]:
         print('NO UPDATE')
+        for i in range(3):
+            print('PRGM.: %s // PER. : %s' %(newdt.iloc[i][0], newdt.iloc[i][1]))            
     else:
         print('NEW ARTICLE(S) POSTED')
         for i in range(len(newdt)):
@@ -48,6 +51,8 @@ def updatecheck(newdt):
             if extcheck == 0:
                 print('PRGM.: %s // PER. : %s' %(newdt.iloc[i][0], newdt.iloc[i][1]))
         newdt.to_csv('pastresult.csv', index=False)
+        wb.open(url)
+        
 
     
 result = articlecrawling(noticeboardurl, noticeboardid, articledateid, articletitleid)
@@ -56,4 +61,4 @@ if os.path.isfile('pastresult.csv') == False:
         print('PRGM.: %s // PER. : %s' %(result.iloc[i][0], result.iloc[i][1]))
     result.to_csv('pastresult.csv', index=False)
 else:
-    updatecheck(result)
+    updatecheck(result, noticeboardurl)
