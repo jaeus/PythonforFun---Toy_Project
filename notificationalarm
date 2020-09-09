@@ -17,7 +17,6 @@ def articlecrawling(url, htmlid, dateid, titleid):
     
     dateinfo = htmltext.find_all('dd')
     titleinfo = htmltext.find_all('dt')
-    
     argddt = pds.DataFrame(columns=['TITLE', 'APPLICABLE PERIOD'])
     dateresult = []
     replacement = ['프로그램기간', '\r', '\n', '\t', '접수', '예정', '완료']
@@ -51,7 +50,12 @@ def updatecheck(newdt, url):
             if extcheck == 0:
                 print('PRGM.: %s // PER. : %s' %(newdt.iloc[i][0], newdt.iloc[i][1]))
         newdt.to_csv('pastresult.csv', index=False)
-        wb.open(url)
+        
+        webopen = input('DO YOU WANT TO OPEN THE WEBSITE TO CHECK? (Y/N) : ').lower()
+        if webopen == 'y':
+            wb.open(url)
+        else:
+            pass
         
 
     
