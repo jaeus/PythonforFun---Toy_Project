@@ -1,0 +1,183 @@
+import pandas as pds
+import numpy as npy
+import requests as rq
+import lxml
+from bs4 import BeautifulSoup as bs
+import warnings
+warnings.filterwarnings('ignore')
+
+def initializing(url, tag):
+    webget = rq.get(url)
+    htmltext = bs(webget.content, 'html')
+    contents = htmltext.find_all(tag)
+    return(contents)
+
+def textfromhtml(contents, removelist):
+    textonly = []
+    for i in contents:
+        if '<a h' in str(i):
+            pass
+        else:
+            textonly.append(i.get_text(strip=True).replace(u'\xa0', u' '))
+
+#     i = 0
+    trigger = 0
+    while trigger == 0:
+        for i in range(len(textonly)):
+            if textonly[i][0:4] in removelist:
+                textonly.remove(textonly[i])
+                break
+            if i >= len(textonly)-1:
+                trigger = 1
+    return(textonly)
+
+def releasedateextract(data):
+    datelist = []
+    for i in data:
+        if '#' in i:
+            datelist.append(i.split(' '))
+    datelist.reverse()
+    return(datelist)
+
+def caseseperation(datelist, data):
+    caselist = [[] for i in range(len(datelist))]
+    j = len(datelist)-1
+    for i in data:
+        if '#' in i:
+            if len(caselist[j]) == 0:
+                pass
+            else:
+                j -= 1
+        caselist[j].append(i)
+    return(caselist)
+
+def numberofpeople(caselist, eachsentence):
+    for character in eachsentence:
+        if not character.isdigit():
+            if 'Number of' in eachsentence and ':' in eachsentence:
+                digitizedvalue = numberprint(eachsentence)
+                return([int(caselist[0].split(' ')[0][1:]), digitizedvalue])
+                break
+            else:
+                break
+        else:
+            if 'points' not in eachsentence:
+                digitizedvalue = numberprint(eachsentence)
+                return([int(caselist[0].split(' ')[0][1:]), digitizedvalue])
+                break
+            
+def numberprint(digit):
+    no = re.findall('\d+', digit)
+    if len(no) > 1:
+        value = int(no[0]+no[1])
+    else:
+        value = int(no[0])
+    return(value)
+
+def programname(dt, sentencelist):
+    namelist = []
+    for i in dt:
+        for j in i:
+            if 'This round' in j or 'Candidates from' in j:
+                pass
+            else:
+                for s in sentencelist:
+                    if s in j.lower():
+                        namelist.append([int(i[0].split(' ')[0][1:]), j])
+
+    rfndnamelist = duplicateremove(namelist)
+    return(rfndnamelist)
+
+def duplicateremove(inputlist):
+    for i in range(len(inputlist)):
+        if i < len(inputlist)-1:
+            if inputlist[i][0] == inputlist[i+1][0]:
+                if inputlist[i][1] in inputlist[i+1][1]:
+                    inputlist.remove(inputlist[i+1])
+    return(inputlist)
+
+def scoreorginizer(dt):
+    datalist = []
+    for i in dt:
+        for j in i:
+            if 'crs score' in j.lower() and ':' in j:
+                datalist.append([int(i[0].split(' ')[0][1:]), int(j.split(':')[1])])
+            elif 'points' in j.lower():
+                datalist.append([int(i[0].split(' ')[0][1:]), int(j.split(' ')[0])])
+    return(datalist)
+    
+    
+    
+    
+    
+    
+irccurl = 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations/results-previous.html'
+irccurllatest = 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations.html'
+taglist = ['h3', 'h4', 'p', 'td', 'th']
+actualcontents = initializing(irccurl, taglist)
+actualcontentslatest = initializing(irccurllatest, 'p')
+
+
+
+exceptionlist = ['Retu', 'You ', 'Than', 'Mini', 'See ']
+exceptionlistlatest = ['COVI', 'Upda', 'We r', 'Each', 'The ', 'Chec', 'See ', 'Cand']
+prgmsentence = ['no program', 'provincial nominee', 'canadian experience', 'federal skilled']
+textized = textfromhtml(actualcontents, exceptionlist)
+textizedlatest = textfromhtml(actualcontentslatest, exceptionlistlatest)
+
+textizedlatest[0] = '#' + textizedlatest[0].split('#')[1] #only for the latest one
+releaseddate = releasedateextract(textized)
+[templatest] = releasedateextract(textizedlatest)
+releaseddate.append(templatest)
+
+eachcase = caseseperation(releaseddate, textized)
+eachcase.append(textizedlatest)
+
+
+
+amntlist = []
+for i in eachcase:
+    for j in i:
+        result = numberofpeople(i, j)
+        if result != None:
+            amntlist.append(result)
+            
+prgmnamelist = programname(eachcase, prgmsentence)
+crsscorelist = scoreorginizer(eachcase)
+
+
+
+if len(prgmnamelist) != len(crsscorelist) or len(amntlist) != len(crsscorelist):
+    print('CHECK THE CODE OR DATA')
+    print('[NUMBER OF INVITATION] %s\n%s' %(len(amntlist), amntlist))
+    print('[PROGRAM NAMES] %s\n%s' %(len(prgmnamelist), prgmnamelist))
+    print('[CRS SCORES] %s\n%s' %(len(crsscorelist), crsscorelist))
+    pass
+else:
+    for i in range(len(amntlist)):
+        if amntlist[i][0] == prgmnamelist[i][0] and amntlist[i][0] == crsscorelist[i][0]:
+            amntlist[i].append(prgmnamelist[i][1])
+            amntlist[i].append(crsscorelist[i][1])
+        else:
+            print('CHECK THE CODE OR DATA')
+            
+            
+            
+rfnddt = pds.DataFrame(index=npy.arange(len(releaseddate)), columns=titlelist)
+titlelist = ['No.', 'DATE(Y)', 'DATE(M)', 'DATE(D)', 'Amnt.', 'EE', 'PNP', 'CEC', 'FST']
+
+for i in range(len(releaseddate)):
+    rfnddt.iloc[i][0] = releaseddate[i][0]
+    rfnddt.iloc[i][1] = releaseddate[i][4]
+    rfnddt.iloc[i][2] = releaseddate[i][2]
+    rfnddt.iloc[i][3] = releaseddate[i][3].replace(',','')
+rfnddt.replace(npy.nan, 0, inplace=True)
+
+for i in range(len(amntlist)):
+    rfnddt.loc[(rfnddt['No.'] == ('#' + str(amntlist[i][0]))), 'Amnt.'] += amntlist[i][1]
+
+    for j in range(len(prgmsentence)):
+        if prgmsentence[j] in amntlist[i][2].lower():
+            rfnddt.loc[(rfnddt['No.'] == ('#' + str(amntlist[i][0]))), titlelist[5+j]] = amntlist[i][3]
+
+rfnddt
