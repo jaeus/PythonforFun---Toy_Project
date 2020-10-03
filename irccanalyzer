@@ -1,7 +1,7 @@
 import pandas as pds
 import numpy as npy
 import requests as rq
-import lxml
+import re
 from bs4 import BeautifulSoup as bs
 import warnings
 warnings.filterwarnings('ignore')
@@ -19,8 +19,6 @@ def textfromhtml(contents, removelist):
             pass
         else:
             textonly.append(i.get_text(strip=True).replace(u'\xa0', u' '))
-
-#     i = 0
     trigger = 0
     while trigger == 0:
         for i in range(len(textonly)):
@@ -108,9 +106,6 @@ def scoreorginizer(dt):
     
     
     
-    
-    
-    
 irccurl = 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations/results-previous.html'
 irccurllatest = 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations.html'
 taglist = ['h3', 'h4', 'p', 'td', 'th']
@@ -132,8 +127,6 @@ releaseddate.append(templatest)
 
 eachcase = caseseperation(releaseddate, textized)
 eachcase.append(textizedlatest)
-
-
 
 amntlist = []
 for i in eachcase:
@@ -161,10 +154,8 @@ else:
         else:
             print('CHECK THE CODE OR DATA')
             
-            
-            
-rfnddt = pds.DataFrame(index=npy.arange(len(releaseddate)), columns=titlelist)
 titlelist = ['No.', 'DATE(Y)', 'DATE(M)', 'DATE(D)', 'Amnt.', 'EE', 'PNP', 'CEC', 'FST']
+rfnddt = pds.DataFrame(index=npy.arange(len(releaseddate)), columns=titlelist)
 
 for i in range(len(releaseddate)):
     rfnddt.iloc[i][0] = releaseddate[i][0]
@@ -179,5 +170,50 @@ for i in range(len(amntlist)):
     for j in range(len(prgmsentence)):
         if prgmsentence[j] in amntlist[i][2].lower():
             rfnddt.loc[(rfnddt['No.'] == ('#' + str(amntlist[i][0]))), titlelist[5+j]] = amntlist[i][3]
-
+            
+rfnddt.insert(1, column='DATE',
+              value=rfnddt[['DATE(Y)', 'DATE(M)', 'DATE(D)']].agg('-'.join, axis=1))
+rfnddt['DATE'] = pds.to_datetime(rfnddt['DATE']).dt.strftime('%m/%d/%Y')
 rfnddt
+
+
+
+
+
+import matplotlib.pyplot as mpl
+from matplotlib.ticker import *
+mpl.close('all')
+
+
+fig, ax = mpl.subplots(figsize=(25,25))
+
+ax.plot(rfnddt['DATE'], rfnddt['Amnt.'], ms=10, alpha=0, label='Number of Invitations', color='skyblue')
+ax.plot(rfnddt['DATE'][(rfnddt['EE'] > 0)], rfnddt['EE'][(rfnddt['EE'] > 0)], '-x', alpha=0.9, label='EE', color='green')
+ax.plot(rfnddt['DATE'][(rfnddt['PNP'] > 0)], rfnddt['PNP'][(rfnddt['PNP'] > 0)], '-x', alpha=0.9, label='PNP', color='purple')
+ax.plot(rfnddt['DATE'][(rfnddt['CEC'] > 0)], rfnddt['CEC'][(rfnddt['CEC'] > 0)], '-x', alpha=0.9, label='CEC', color='red')
+ax.plot(rfnddt['DATE'][(rfnddt['FST'] > 0)], rfnddt['FST'][(rfnddt['FST'] > 0)], '-x', alpha=0.9, label='FST', color='navy')
+
+ax.legend(loc=2, fontsize=20)
+
+ax.set_xlabel('ROUNDS(DATE)', fontsize=25)
+# ax.xaxis.set_major_locator(FixedLocator([0, 20, 40, 60, 80, 100, 120, 140, 160]))
+ax.set_ylabel('CRS score', fontsize=25)
+ax.yaxis.set_major_locator(FixedLocator([0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]))
+ax.set_ylim(0, 1000)
+
+
+ax_second = ax.twinx()
+ax_second.plot(rfnddt['DATE'], rfnddt['Amnt.'], '-o', ms=10, alpha=0.5, label='Number of Invitations', color='skyblue')
+
+ax_second.xaxis.set_major_locator(FixedLocator([0, 20, 40, 60, 80, 100, 120, 140, 160]))
+ax_second.set_ylabel('Number of Invitation', fontsize=25)
+ax_second.yaxis.set_major_locator(FixedLocator([0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000]))
+ax_second.set_ylim(0, 5000)
+
+ax.tick_params(axis='x', labelsize=20, rotation=40)
+ax.tick_params(axis='y', labelsize=20)
+ax_second.tick_params(axis='y', labelsize=20)
+
+
+mpl.show()
+fig.savefig('IRCC.png', DPI=1200)
