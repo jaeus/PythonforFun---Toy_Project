@@ -1,0 +1,22 @@
+##  THE SEQUENCE
+
+
+##  1. Get a symbol list
+
+##  2. Bring Market Capitalization information / Company name
+##    1) Set Market Cap. boundaries - lowest point
+##    2) Drop the companies off from the list which are lower than the boundaries
+
+##  3. Gain Financial Statment / Balance Sheet / Cash Flow
+##    * The crawling logic needs some repairs for small errors
+##    * Must figure out the important objects before getting them all -> read the Accounting book before coding
+##    * Check how and which data to save
+
+##  4. Get Historical Data
+##    1) Remove ETF or anything non-company shares
+##    2) Calculate Stochastic
+##    3) Save data
+##      . each company has data for 30 days and 20,000 companies (maximum) would be 600,000 rows
+##      . or only 5 days amount for each company
+##      . or both but summary data would be for those companies which are in the low moment of Stochastic
+##    4) print the company list with low Stochastic Slow percentage
