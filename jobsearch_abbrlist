@@ -1,0 +1,14 @@
+uslist = []
+canadalist = []
+nameandabv = []
+
+sourcehtml = bs(rq.get('https://www.ncbi.nlm.nih.gov/books/NBK7254/').content, 'html.parser')
+
+for i in sourcehtml.find_all('td'):
+    nameandabv.append(i.get_text(strip=True))
+    if len(nameandabv) == 2:
+        if len(canadalist) <= 12:
+            canadalist.append(nameandabv)
+        else:
+            uslist.append(nameandabv)
+        nameandabv = []
