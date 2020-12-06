@@ -1,0 +1,314 @@
+import pandas as pds
+import requests as rq
+import time as t
+from bs4 import BeautifulSoup as bs
+import matplotlib.pyplot as mpl
+%matplotlib inline
+import warnings
+warnings.filterwarnings('ignore')
+import JAYMODULE as jm
+
+##################################################################################################
+# Functions
+def pagecrawl(url, tag, classname, classdata):
+    parserdata = []
+    pagehtmldata = bs(rq.get(url).content, 'html.parser')
+    
+    if classname != '':
+        for i in range(len(tag)):
+            parserdata.append(pagehtmldata.find_all(tag[i], {classname : classdata[i]}))
+        return(parserdata)
+    else:
+        return(pagehtmldata)
+    
+def totaldfcreator():
+    colname = ['SearchSite', 'Location(raw)', 'JobTitle', 'State_Province', 'City_Town']
+    return(pds.DataFrame(columns=colname))
+    
+def csvdfcreator():
+    colname = ['Location(raw)', 'JobTitle', 'State_Province', 'City_Town']
+    return(pds.DataFrame(columns=colname))
+
+def plotdfcreator():
+    colname = ['StateFullname', 'StateCode']
+    return(pds.DataFrame(columns=colname))
+
+def jobinfoextractor(initurl, pageno, pageterm, referred, taglist, classname, classlist, sleeptime, pagelimit, sitename):
+    if taglist != '':
+        pagestartno = pageno
+        capcha = 0
+        strike = 0
+        jobtitle = []
+        address = []
+        while True:
+            urlcomplete = initurl + str(pageno) + referred
+            print(urlcomplete + '\t', end='\r')
+            parserdata = pagecrawl(urlcomplete, taglist, classname, classlist)
+            if len(parserdata[0]) == 0:
+                capcha = 1
+                print('CAPCHA DETECTED                                                                        ')
+                break
+
+            if capcha == 0:
+                if len(parserdata[0]) != len(parserdata[1]):
+                    if len(parserdata[0]) < len(parserdata[1]):
+                        for i in range(len(parserdata[1])):
+                            if i == len(parserdata[1]):
+                                break                        
+                            if 'ocationx' in parserdata[1][i].get_text(strip=True):
+                                del parserdata[1][i]
+                    else:
+                        errorcheck(parserdata)
+                        capcha = 1
+                        break
+
+                if len(parserdata[0]) == len(parserdata[1]):
+                    for i in range(len(parserdata[0])):
+                        checker = 0
+                        if pageno >= pagestartno + (2 * pageterm):
+                            if i <= len(parserdata[0]) - 3:
+                                for j in range(3):
+                                    if parserdata[0][i+j].get_text(strip=True) ==\
+                                    jobtitle[len(jobtitle)-len(parserdata[0])+i]:
+                                        if j == 2:
+                                            checker = 1
+                                            strike += 1
+                                            break
+                                        else:
+                                            pass
+                        if checker == 0:
+                            jobtitle.append(parserdata[0][i].get_text(strip=True))
+                            address.append(parserdata[1][i].get_text(strip=True))
+                        else:
+                            break
+                else:
+                    errorcheck(parserdata)
+                    capcha = 1
+                    break
+
+
+                pageno += pageterm
+                t.sleep(sleeptime)
+                if strike >= 15:
+                    print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                                \n'\
+                          %(sitename, len(jobtitle)))
+                    break
+                elif pageno >= pagelimit:
+                    print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                                          \n'\
+                          %(sitename, len(jobtitle)))
+                    break
+
+        if capcha == 0:
+            return(jobtitle, address)
+    else:
+        return(manualjobandaddress(initurl, pageno, pageterm, referred, sleeptime, pagelimit, sitename))
+    
+def manualjobandaddress(initurl, pageno, pageterm, referred, sleeptime, pagelimit, sitename):
+    strike = 0
+    endpage = 0
+    jobtitle = []
+    address = []
+    while True:
+        urlcomplete = initurl + str(pageno) + referred
+        print(urlcomplete + '\t', end='\r')
+        parserdata = pagecrawl(urlcomplete, '', '', '')
+        for i in parserdata:
+            if 'page doesn' in i:
+                endpage = 1
+                break
+                
+        if endpage == 0:
+            for i in parserdata:
+                if 'totalResults' in str(i):
+                    resultrawdata = str(i).split('totalResults')[1]
+                    break
+        
+            jobtitlecheck = []
+            addresscheck = []
+            for j in range(1, 26):
+                if '"location":"' in resultrawdata.split('"title":"')[j]:
+                    jobtitlecheck.append(resultrawdata.split('"title":"')[j].split('",')[0].replace('\\u0026', '&'))
+                    addresscheck.append(resultrawdata.split('"title":"')[j].split(',"location":"')[1].split('",')[0])
+                else:
+                    break
+                
+            checker = 0
+            if len(jobtitle) > 0:
+                for i in range(5):
+                    if jobtitle[len(jobtitle)-1-i] == jobtitlecheck[len(jobtitlecheck)-1-i]:
+                        if i == 4:
+                            strike += 1
+                            checker == 1
+                            break
+                        else:
+                            pass
+            if checker == 0:
+                for j in range(len(jobtitlecheck)):
+                    jobtitle.append(jobtitlecheck[j])
+                    address.append(addresscheck[j])
+        pageno += pageterm
+        t.sleep(sleeptime)
+        if strike >= 15:
+            print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                    \n'\
+                  %(sitename, len(jobtitle)))
+            break
+        elif pageno >= pagelimit:
+            print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                              \n'\
+                  %(sitename, len(jobtitle)))
+            break
+        elif endpage == 1:
+            print('<%s> COMPLETE - LAST PAGE REACHED (%s jobs stored)                                           \n'\
+                  %(sitename, len(jobtitle)))
+            break
+        
+    return(jobtitle, address)
+
+def addressseparator(addressrawlist, codelist, selectedcountry):
+    statecodelist = []
+    cityortownlist = []
+    for i in addressrawlist:
+        if ', ' not in i:
+            if 'nited ' in i or ('' in i and selectedcountry == 'United States'):
+                statecodelist.append('USA')
+                cityortownlist.append('-')
+            elif 'anada' in i or ('' in i and selectedcountry == 'Canada'):
+                statecodelist.append('Canada')
+                cityortownlist.append('-')
+            else:
+                checkmark = 0
+                for j in codelist:
+                    if i in j[0] or i in j[1]:
+                        statecodelist.append(j[0])
+                        cityortownlist.append('-')
+                        checkmark = 1
+                        break
+                if checkmark == 0:
+                    statecodelist.append(i)
+                    cityortownlist.append('-')
+        else:
+            checkmark = 0
+            for j in codelist:
+                if j[0] in i.split(', ')[1] or j[1] in i.split(', ')[1]:
+                    statecodelist.append(j[0])
+                    cityortownlist.append(i.split(', ')[0])
+                    checkmark = 1
+                    break
+            if checkmark == 0:
+                if selectedcountry == 'United States':
+                    statecodelist.append('USA')
+                    cityortownlist.append('-')
+                elif selectedcountry == 'Canada':
+                    statecodelist.append('Canada')
+                    cityortownlist.append('-')
+    return(statecodelist, cityortownlist)
+
+def errorcheck(parserdata):
+    print('CHECK THE CODE AGAIN (%s, %s)                          \n\n' %(len(parserdata[0]), len(parserdata[1])))
+    if len(parserdata[0]) < len(parserdata[1]):
+        end = len(parserdata[1])
+    else:
+        end = len(parserdata[0])
+    for i in range(end):
+        if i >= len(parserdata[0]):
+            if i == len(parserdata[1]):
+                print('ALL DONE')
+            else:
+                print('OUT OF RANGE', parserdata[1][i].get_text(strip=True))
+        elif i >= len(parserdata[1]):
+            if i == len(parserdata[0]):
+                print('ALL DONE')
+            else:
+                print(parserdata[0][i].get_text(strip=True), ' OUT OF RANGE')
+        else:
+            print(parserdata[0][i].get_text(strip=True), parserdata[1][i].get_text(strip=True))
+    return(0)
+
+
+##################################################################################################
+# State/Province list
+uslist = []
+canadalist = []
+nameandabv = []
+
+sourcehtml = bs(rq.get('https://www.ncbi.nlm.nih.gov/books/NBK7254/').content, 'html.parser')
+
+for i in sourcehtml.find_all('td'):
+    nameandabv.append(i.get_text(strip=True))
+    if len(nameandabv) == 2:
+        if len(canadalist) <= 12:
+            canadalist.append(nameandabv)
+        else:
+            uslist.append(nameandabv)
+        nameandabv = []
+        
+        
+        
+        
+##################################################################################################
+# Job and Country list
+jobsearchlist = ['Solidworks', 'CATIA', 'Mechanical Design', 'Mechanical Engineer', 'illustrator', 'Graphic Design',
+                 'nurse', 'Carpenter']
+locationlist = ['United States', 'Canada']
+searchsitelist = ['INDEED.COM', 'MONSTER.COM', 'LADDERS.COM']
+
+jobtitle = jobsearchlist[0]
+countryname = locationlist[0]
+
+
+
+
+##################################################################################################
+# Executing the Program
+gatheredinfo = totaldfcreator()
+
+if 'nited' in countryname:
+    statelist = uslist.copy()
+elif 'anada' in countryname:
+    statelist = canadalist.copy()
+
+for i in range(len(searchsitelist)):
+    siteinitializing = jm.jobsearchinit(i, jobtitle, countryname)
+    startpageno = siteinitializing[0]
+    increasingno = siteinitializing[1]
+    crawlbreak = siteinitializing[2]
+    lastpagelimit = siteinitializing[3]
+    referred = siteinitializing[4]
+    findtaglist = siteinitializing[5]
+    findclassname = siteinitializing[6]
+    findclasslist = siteinitializing[7]
+    urlform = siteinitializing[8]
+    
+    jobandaddressraw = jobinfoextractor(urlform, startpageno, increasingno, referred, findtaglist,
+                                        findclassname, findclasslist, crawlbreak, lastpagelimit, searchsitelist[i])
+    addressdetail = addressseparator(jobandaddressraw[1], statelist, countryname)
+    
+    jobinfo = csvdfcreator()
+    jobinfo['Location(raw)'] = jobandaddressraw[1]
+    jobinfo['JobTitle'] = jobandaddressraw[0]
+    jobinfo['State_Province'] = addressdetail[0]
+    jobinfo['City_Town'] = addressdetail[1]
+    jobinfo['SearchSite'] = searchsitelist[i]
+#     jobinfo.to_csv(jobsearchsite.split('.')[0] + '-' + jobtitle + '_in ' + countryname + '.csv', index=False)
+    
+    gatheredinfo = pds.concat([gatheredinfo, jobinfo], ignore_index=True)
+    
+gatheredinfo.to_csv(jobtitle.upper() + ' jobs in ' + countryname + '.csv')
+jobandstate = plotdfcreator()
+eachstatejobs = []
+for i in range(len(statelist)):
+    jobandstate.loc[len(jobandstate)] = statelist[i]
+    eachstatejobs.append(gatheredinfo['State_Province'][gatheredinfo.State_Province == statelist[i][0]].count())
+jobandstate['JobAmount'] = eachstatejobs
+
+print(jobandstate.sort_values(by=['JobAmount'], ascending=False).head())
+mpl.subplots(figsize=(25,25))
+mpl.subplots_adjust(bottom=0.25)
+jobandstate.set_index('StateFullname')['JobAmount'].plot(kind='bar')
+mpl.axhline(0, color='k')
+mpl.title(label=jobtitle.upper() + ' jobs in ' + countryname, fontsize=50)
+mpl.xticks(fontsize=23)
+mpl.xlabel(xlabel='States/Province', fontsize=23)
+mpl.yticks(fontsize=25)
+mpl.ylabel(ylabel='Number of Jobs', fontsize=25)
+mpl.savefig(jobtitle.upper() + ' jobs in ' + countryname + '.png', dpi=300)
+mpl.show()
