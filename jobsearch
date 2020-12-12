@@ -1,6 +1,7 @@
 import pandas as pds
 import requests as rq
 import time as t
+import os
 from bs4 import BeautifulSoup as bs
 import matplotlib.pyplot as mpl
 %matplotlib inline
@@ -90,11 +91,11 @@ def jobinfoextractor(initurl, pageno, pageterm, referred, taglist, classname, cl
                 pageno += pageterm
                 t.sleep(sleeptime)
                 if strike >= 15:
-                    print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                                \n'\
+                    print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                                '\
                           %(sitename, len(jobtitle)))
                     break
                 elif pageno >= pagelimit:
-                    print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                                          \n'\
+                    print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                                          '\
                           %(sitename, len(jobtitle)))
                     break
 
@@ -149,15 +150,15 @@ def manualjobandaddress(initurl, pageno, pageterm, referred, sleeptime, pagelimi
         pageno += pageterm
         t.sleep(sleeptime)
         if strike >= 15:
-            print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                    \n'\
+            print('<%s> COMPLETE - DUPLICATED PAGES ARE FOUND OVER 15 TIMES (%s jobs stored)                      '\
                   %(sitename, len(jobtitle)))
             break
         elif pageno >= pagelimit:
-            print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                              \n'\
+            print('<%s> COMPLETE - TOO MANY PAGES (%s jobs stored)                                                '\
                   %(sitename, len(jobtitle)))
             break
         elif endpage == 1:
-            print('<%s> COMPLETE - LAST PAGE REACHED (%s jobs stored)                                           \n'\
+            print('<%s> COMPLETE - LAST PAGE REACHED (%s jobs stored)                                             '\
                   %(sitename, len(jobtitle)))
             break
         
@@ -226,20 +227,39 @@ def errorcheck(parserdata):
 
 ##################################################################################################
 # State/Province list
-uslist = []
-canadalist = []
+countries = ['uslist', 'canadalist']
 nameandabv = []
+for i in countries:
+    globals()[i] = []
+    
 
-sourcehtml = bs(rq.get('https://www.ncbi.nlm.nih.gov/books/NBK7254/').content, 'html.parser')
-
-for i in sourcehtml.find_all('td'):
-    nameandabv.append(i.get_text(strip=True))
-    if len(nameandabv) == 2:
-        if len(canadalist) <= 12:
-            canadalist.append(nameandabv)
-        else:
-            uslist.append(nameandabv)
-        nameandabv = []
+for i in countries:
+    if os.path.exists(i + '.txt') == True:
+        txtopen = open(i + '.txt', 'r')
+        globals()[i] = []
+        for j in txtopen.readlines():
+            globals()[i].append(j.replace('\n', '').split('///'))
+        txtopen.close()
+        print(str(i).upper(), 'LOADING COMPLETE')
+    else:
+        sourcehtml = bs(rq.get(jm.stateandprovincesrouce).content, 'html.parser')
+        
+        for j in sourcehtml.find_all('td'):
+            nameandabv.append(j.get_text(strip=True))
+            if len(nameandabv) == 2:
+                if len(globals()[countries[1]]) <= 12:
+                    globals()[countries[1]].append(nameandabv)
+                else:
+                    globals()[countries[0]].append(nameandabv)
+                nameandabv = []
+        txtopen = open(i + '.txt', 'w')
+        for j in globals()[i]:
+            txtopen.write(j[0])
+            txtopen.write('///')
+            txtopen.write(j[1])
+            txtopen.write('\n')
+        txtopen.close()
+        print(str(i).upper(), 'SAVING COMPLETE')
         
         
         
@@ -253,7 +273,7 @@ searchsitelist = ['INDEED.COM', 'MONSTER.COM', 'LADDERS.COM']
 
 jobtitle = jobsearchlist[0]
 countryname = locationlist[0]
-
+print('%s in %s' %(jobtitle, countryname))
 
 
 
@@ -288,7 +308,6 @@ for i in range(len(searchsitelist)):
     jobinfo['State_Province'] = addressdetail[0]
     jobinfo['City_Town'] = addressdetail[1]
     jobinfo['SearchSite'] = searchsitelist[i]
-#     jobinfo.to_csv(jobsearchsite.split('.')[0] + '-' + jobtitle + '_in ' + countryname + '.csv', index=False)
     
     gatheredinfo = pds.concat([gatheredinfo, jobinfo], ignore_index=True)
     
@@ -300,7 +319,7 @@ for i in range(len(statelist)):
     eachstatejobs.append(gatheredinfo['State_Province'][gatheredinfo.State_Province == statelist[i][0]].count())
 jobandstate['JobAmount'] = eachstatejobs
 
-print(jobandstate.sort_values(by=['JobAmount'], ascending=False).head())
+print('\n\n', jobandstate.sort_values(by=['JobAmount'], ascending=False).head())
 mpl.subplots(figsize=(25,25))
 mpl.subplots_adjust(bottom=0.25)
 jobandstate.set_index('StateFullname')['JobAmount'].plot(kind='bar')
