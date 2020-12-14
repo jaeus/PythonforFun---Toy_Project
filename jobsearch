@@ -264,6 +264,7 @@ for i in countries:
         
         
         
+        
 ##################################################################################################
 # Job and Country list
 jobsearchlist = ['Solidworks', 'CATIA', 'Mechanical Design', 'Mechanical Engineer', 'illustrator', 'Graphic Design',
@@ -271,9 +272,11 @@ jobsearchlist = ['Solidworks', 'CATIA', 'Mechanical Design', 'Mechanical Enginee
 locationlist = ['United States', 'Canada']
 searchsitelist = ['INDEED.COM', 'MONSTER.COM', 'LADDERS.COM']
 
-jobtitle = jobsearchlist[0]
+jobtitle = jobsearchlist[3]
 countryname = locationlist[0]
-print('%s in %s' %(jobtitle, countryname))
+print('%s in %s' %(jobtitle.upper(), countryname))
+
+
 
 
 
@@ -281,8 +284,10 @@ print('%s in %s' %(jobtitle, countryname))
 # Executing the Program
 gatheredinfo = totaldfcreator()
 
+middle = ' jobs in '
 if 'nited' in countryname:
     statelist = uslist.copy()
+    middle = ' jobs in the '
 elif 'anada' in countryname:
     statelist = canadalist.copy()
 
@@ -314,20 +319,36 @@ for i in range(len(searchsitelist)):
 gatheredinfo.to_csv(jobtitle.upper() + ' jobs in ' + countryname + '.csv')
 jobandstate = plotdfcreator()
 eachstatejobs = []
-for i in range(len(statelist)):
-    jobandstate.loc[len(jobandstate)] = statelist[i]
-    eachstatejobs.append(gatheredinfo['State_Province'][gatheredinfo.State_Province == statelist[i][0]].count())
-jobandstate['JobAmount'] = eachstatejobs
+for i in range(len(searchsitelist)):
+    eachstatejobs = []
+    for j in range(len(statelist)):
+        if i == 0:
+            jobandstate.loc[len(jobandstate)] = statelist[j]
+        eachstatejobs.append(gatheredinfo['State_Province'][(gatheredinfo.State_Province == statelist[j][0]) &\
+                                                            (gatheredinfo.SearchSite == searchsitelist[i])].count())
+    jobandstate['JobAmount_' + searchsitelist[i]] = eachstatejobs
+jobandstate['JobAmount_Total'] = 0    
+for i in searchsitelist:
+    jobandstate['JobAmount_Total'] += jobandstate['JobAmount_' + i]
+print('\n', jobandstate[['StateFullname', 'JobAmount_Total']]
+      .sort_values(by=['JobAmount_Total'], ascending=False).head())
 
-print('\n\n', jobandstate.sort_values(by=['JobAmount'], ascending=False).head())
-mpl.subplots(figsize=(25,25))
+
+fig, ax = mpl.subplots(figsize=(25,25))
+for i in range(len(searchsitelist)):
+    globals()['bardata_'+str(i+1)] = jobandstate['JobAmount_'+searchsitelist[i]]
+
+width = 0.8
+labels = jobandstate['StateFullname']
+ax.bar(labels, bardata_1, width, label=searchsitelist[0])
+ax.bar(labels, bardata_2, width, bottom=bardata_1, label=searchsitelist[1])
+ax.bar(labels, bardata_3, width, bottom=[i+j for i,j in zip(bardata_1, bardata_2)], label=searchsitelist[2])
+ax.legend(loc='best', fontsize=23)
+ax.set_xlabel('States/Province', fontsize=23)
+ax.set_ylabel('Number of Jobs', fontsize=25)
+ax.set_title(jobtitle.upper() + middle + countryname, fontsize=50)
 mpl.subplots_adjust(bottom=0.25)
-jobandstate.set_index('StateFullname')['JobAmount'].plot(kind='bar')
-mpl.axhline(0, color='k')
-mpl.title(label=jobtitle.upper() + ' jobs in ' + countryname, fontsize=50)
-mpl.xticks(fontsize=23)
-mpl.xlabel(xlabel='States/Province', fontsize=23)
+mpl.xticks(fontsize=23, rotation='vertical')
 mpl.yticks(fontsize=25)
-mpl.ylabel(ylabel='Number of Jobs', fontsize=25)
 mpl.savefig(jobtitle.upper() + ' jobs in ' + countryname + '.png', dpi=300)
 mpl.show()
