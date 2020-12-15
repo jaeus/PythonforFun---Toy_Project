@@ -15,6 +15,9 @@ def pagecrawl(url, tag, classname, classdata):
     parserdata = []
     pagehtmldata = bs(rq.get(url).content, 'html.parser')
     
+    for i in pagehtmldata:
+        if 't find any jobs matching your criteria' in str(i):
+            parserdata.append("Sorry, we didn't find any jobs matching your criteria")
     if classname != '':
         for i in range(len(tag)):
             parserdata.append(pagehtmldata.find_all(tag[i], {classname : classdata[i]}))
@@ -47,8 +50,13 @@ def jobinfoextractor(initurl, pageno, pageterm, referred, taglist, classname, cl
             parserdata = pagecrawl(urlcomplete, taglist, classname, classlist)
             if len(parserdata[0]) == 0:
                 capcha = 1
-                print('CAPCHA DETECTED                                                                        ')
+                print('CAPCHA DETECTED                                                                            ')
                 break
+            else:
+                if 'any jobs matching your criteria' in parserdata[0]:
+                    print('<%s> COMPLETE - LAST PAGE REACHED (%s jobs stored)                                                          '\
+                          %(sitename, len(jobtitle)))
+                    break
 
             if capcha == 0:
                 if len(parserdata[0]) != len(parserdata[1]):
@@ -290,6 +298,7 @@ if 'nited' in countryname:
     middle = ' jobs in the '
 elif 'anada' in countryname:
     statelist = canadalist.copy()
+    searchsitelist.remove(searchsitelist[2])
 
 for i in range(len(searchsitelist)):
     siteinitializing = jm.jobsearchinit(i, jobtitle, countryname)
@@ -342,7 +351,8 @@ width = 0.8
 labels = jobandstate['StateFullname']
 ax.bar(labels, bardata_1, width, label=searchsitelist[0])
 ax.bar(labels, bardata_2, width, bottom=bardata_1, label=searchsitelist[1])
-ax.bar(labels, bardata_3, width, bottom=[i+j for i,j in zip(bardata_1, bardata_2)], label=searchsitelist[2])
+if len(searchsitelist) > 2:
+    ax.bar(labels, bardata_3, width, bottom=[i+j for i,j in zip(bardata_1, bardata_2)], label=searchsitelist[2])
 ax.legend(loc='best', fontsize=23)
 ax.set_xlabel('States/Province', fontsize=23)
 ax.set_ylabel('Number of Jobs', fontsize=25)
