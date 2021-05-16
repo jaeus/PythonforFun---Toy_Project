@@ -1,0 +1,60 @@
+import pandas as pds
+import JAYMODULE as jm
+import os
+import sys
+import shutil
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5 import *
+import time as t
+import requests as rq
+from bs4 import BeautifulSoup as bs
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+import urllib3
+urllib3.disable_warnings()
+
+def htmldata(func_url):
+    return(bs(rq.get(func_url, verify=False).content, 'html.parser'))
+
+def articlelistcheck(func_url):
+    func_rawaddresslist = htmldata(func_url).find_all('a', {'class' : 'Link__link___3dWao'})
+    func_articlelist = []
+    for i in func_rawaddresslist:
+        if len(i) < 50 and '<h4 class="River__hed___re6RP"' in str(i):
+            func_articlelist.append(jm.typerarticledomain() + str(i).split(' href="')[1].split('"><h4 class=')[0])
+    return(func_articlelist)
+
+def eacharticleextractor(func_articlelist, func_articledt):
+    for no in range(len(func_articlelist)):
+        print('%s%% COMPLETE                                   ' %(round(no/len(func_articlelist)*100, 2)), end='\r')
+        func_temparticle = []
+        func_temphtmldata = htmldata(func_articlelist[no])
+        
+        for cls in jm.articleclasslist():
+            for cntnts in func_temphtmldata.find_all('p', {'class' : cls}):
+                func_temparticle.append(cntnts.get_text('///', strip=True).\
+                                        replace('///', ' ').replace('—', '-').replace(' , ', ',').
+                                        replace(' . ', '. ').replace(" ’ ", "' ").replace(' & ', '&').
+                                        replace('”', '"').replace(' " ', '" ').replace(" ’s", "'s").
+                                        replace('  ', ' '))
+                if len(func_temparticle) > 1:
+                    func_temparticle = duplicatecheck(func_temparticle)
+        func_articledt.loc[len(func_articledt)] = ' '
+        func_articledt['TITLE'][no] = func_temphtmldata.find_all('title')[0].get_text(strip=True).split(' | ')[0]
+        for temppara in range(len(func_temparticle)):
+            func_articledt.loc[len(func_articledt)-1][temppara+1] = func_temparticle[temppara]
+        t.sleep(1)
+    print('100% COMPLETE                                                 ')
+    
+    func_articledt.to_csv('articledt.csv', index=False)
+    return(func_articledt)
+
+def duplicatecheck(func_temparticle):
+    if func_temparticle[len(func_temparticle)-1] == func_temparticle[len(func_temparticle)-2]:
+        del func_temparticle[len(func_temparticle)-1]
+    return(func_temparticle)
+
+
+articledt = pds.DataFrame(columns=columnnames)
+articledt = eacharticleextractor(articlelist, articledt)
