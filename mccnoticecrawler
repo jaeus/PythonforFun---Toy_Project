@@ -1,0 +1,69 @@
+import JAYMODULE as jm
+import pandas as pds
+import requests as rq
+from bs4 import BeautifulSoup as bs
+import webbrowser as wb
+import os
+import warnings
+warnings.filterwarnings('ignore')
+
+noticeboardurl = jm.mccurl
+noticeboardid = jm.mccnoticeboardid
+articledateid = jm.mccarticledateid
+articletitleid = jm.mccarticletitleid
+
+def articlecrawling(url, htmlid, dateid, titleid):
+    webget = rq.get(url, verify=False)
+    htmltext = bs(webget.text, 'html.parser').select(htmlid)[0]
+    
+    dateinfo = htmltext.find_all('dd')
+    titleinfo = htmltext.find_all('dt')
+    argddt = pds.DataFrame(columns=['TITLE', 'APPLICABLE PERIOD'])
+    dateresult = []
+    replacement = ['프로그램기간', '\r', '\n', '\t', '접수', '예정', '완료']
+    
+    if len(dateinfo) == len(titleinfo):
+        for i in range(len(titleinfo)):
+            titletext = titleinfo[i].select(titleid)[0].get_text(strip=True)
+            datetext = dateinfo[i].select(dateid)[0].get_text(strip=True)
+            for w in replacement:
+                datetext = datetext.replace(w, '')
+            argddt.loc[i] = (titletext, datetext)
+        return(argddt)
+    else:
+        print('SOME OF ID CONDITIONS ARE WRONG - CHECK HTML DETAIL')
+        print(htmltext)
+        
+def updatecheck(newdt, url):
+    olddt = pds.read_csv('pastresult.csv')
+    if newdt.iloc[0][0] == olddt.iloc[0][0]:
+        print(url, '\nNO UPDATE')
+        for i in range(3):
+            print('PRGM.: %s // PER. : %s' %(newdt.iloc[i][0], newdt.iloc[i][1]))            
+    else:
+        print('NEW ARTICLE(S) POSTED')
+        for i in range(len(newdt)):
+            extcheck = 0
+            for j in range(len(olddt)):
+                if newdt.iloc[i][0] == olddt.iloc[j][0]:
+                    extcheck = 1
+                    break
+            if extcheck == 0:
+                print('PRGM.: %s // PER. : %s' %(newdt.iloc[i][0], newdt.iloc[i][1]))
+        newdt.to_csv('pastresult.csv', index=False)
+        
+        webopen = input('DO YOU WANT TO OPEN THE WEBSITE TO CHECK? (Y/N) : ').lower()
+        if webopen == 'y':
+            wb.open(url)
+        else:
+            pass
+        
+
+    
+result = articlecrawling(noticeboardurl, noticeboardid, articledateid, articletitleid)
+if os.path.isfile('pastresult.csv') == False:
+    for i in range(len(result)):
+        print('PRGM.: %s // PER. : %s' %(result.iloc[i][0], result.iloc[i][1]))
+    result.to_csv('pastresult.csv', index=False)
+else:
+    updatecheck(result, noticeboardurl)
